@@ -39,6 +39,8 @@ type QRProps = {
   marginSize?: number;
   imageSettings?: ImageSettings;
   title?: string;
+  // Should be a real enum, but doesn't seem to be compatible with real code.
+  shape?: string;
 };
 type QRPropsCanvas = QRProps & React.CanvasHTMLAttributes<HTMLCanvasElement>;
 type QRPropsSVG = QRProps & React.SVGAttributes<SVGSVGElement>;
@@ -48,6 +50,7 @@ const DEFAULT_LEVEL = 'L';
 const DEFAULT_BGCOLOR = '#FFFFFF';
 const DEFAULT_FGCOLOR = '#000000';
 const DEFAULT_INCLUDEMARGIN = false;
+const DEFAULT_SHAPE = 'rect';
 
 const SPEC_MARGIN_SIZE = 4;
 const DEFAULT_MARGIN_SIZE = 0;
@@ -57,6 +60,75 @@ const DEFAULT_MARGIN_SIZE = 0;
 // really should be number of modules covered), but if for some reason we don't
 // get an explicit height or width, I'd rather default to something than throw.
 const DEFAULT_IMG_SCALE = 0.1;
+
+function isCorner(cellCount: number, cdx: number, rdx: number) {
+  const end = [cellCount - 7, cellCount - 1];
+  const start = [0, 6];
+  return ![
+    {x: start, y: start},
+    {x: end, y: start},
+    {x: start, y: end},
+  ].every(
+    ({x, y}) => !(cdx >= x[0] && cdx <= x[1] && rdx >= y[0] && rdx <= y[1])
+  );
+}
+
+function rect(
+  ctx: CanvasRenderingContext2D,
+  margin: number,
+  rdx: number,
+  cdx: number
+) {
+  ctx.fillRect(cdx + margin, rdx + margin, 1, 1);
+}
+
+function circle(
+  ctx: CanvasRenderingContext2D,
+  margin: number,
+  rdx: number,
+  cdx: number
+) {
+  ctx.beginPath();
+  ctx.arc(cdx + margin + 0.5, rdx + margin + 0.5, 0.5, 0, 2 * Math.PI, false);
+  ctx.fill();
+}
+
+function star(
+  ctx: CanvasRenderingContext2D,
+  margin: number,
+  rdx: number,
+  cdx: number
+) {
+  // Reference: https://jsfiddle.net/m1erickson/8j6kdf4o/
+  const spikes = 5;
+  const innerRadius = 0.25;
+  const outerRadius = 0.5;
+  const cx = cdx + margin + 0.5;
+  const cy = rdx + margin + 0.5;
+  const step = Math.PI / spikes;
+
+  let rot = (Math.PI / 2) * 3;
+  let x = cx;
+  let y = cy;
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - outerRadius);
+  for (let i = 0; i < spikes; i++) {
+    x = cx + Math.cos(rot) * outerRadius;
+    y = cy + Math.sin(rot) * outerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+
+    x = cx + Math.cos(rot) * innerRadius;
+    y = cy + Math.sin(rot) * innerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+  }
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.lineWidth = 5;
+  ctx.fill();
+}
 
 function generatePath(modules: Modules, margin: number = 0): string {
   const ops: Array<string> = [];
@@ -191,6 +263,7 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
     bgColor = DEFAULT_BGCOLOR,
     fgColor = DEFAULT_FGCOLOR,
     includeMargin = DEFAULT_INCLUDEMARGIN,
+    shape = DEFAULT_SHAPE,
     marginSize,
     style,
     imageSettings,
@@ -272,14 +345,22 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
       ctx.fillRect(0, 0, numCells, numCells);
 
       ctx.fillStyle = fgColor;
-      if (SUPPORTS_PATH2D) {
+      if (shape === 'rect' && SUPPORTS_PATH2D) {
         // $FlowFixMe: Path2D c'tor doesn't support args yet.
         ctx.fill(new Path2D(generatePath(cells, margin)));
       } else {
         cells.forEach(function (row, rdx) {
           row.forEach(function (cell, cdx) {
             if (cell) {
-              ctx.fillRect(cdx + margin, rdx + margin, 1, 1);
+              if (isCorner(cells.length, cdx, rdx)) {
+                rect(ctx, margin, rdx, cdx);
+              } else if (shape === 'circle') {
+                circle(ctx, margin, rdx, cdx);
+              } else if (shape === 'star') {
+                star(ctx, margin, rdx, cdx);
+              } else {
+                rect(ctx, margin, rdx, cdx);
+              }
             }
           });
         });

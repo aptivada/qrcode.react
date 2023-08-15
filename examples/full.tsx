@@ -20,6 +20,7 @@ function FullDemo() {
   );
   const [imageExcavate, setImageExcavate] = useState(true);
   const [centerImage, setCenterImage] = useState(true);
+  const [shape, setShape] = useState('rect');
 
   function makeExampleCode(componentName: string) {
     const imageSettingsCode = includeImage
@@ -63,6 +64,7 @@ function FullDemo() {
           excavate: imageExcavate,
         }
       : undefined,
+    shape,
   };
 
   return (
@@ -110,6 +112,17 @@ function FullDemo() {
               <option value="M">M</option>
               <option value="Q">Q</option>
               <option value="H">H</option>
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>
+            Shape:
+            <br />
+            <select onChange={(e) => setShape(e.target.value)} value={shape}>
+              <option value="rect">Rect</option>
+              <option value="circle">Circle</option>
+              <option value="star">Star</option>
             </select>
           </label>
         </div>
