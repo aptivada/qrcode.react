@@ -20,7 +20,9 @@ function FullDemo() {
   );
   const [imageExcavate, setImageExcavate] = useState(true);
   const [centerImage, setCenterImage] = useState(true);
-  const [shape, setShape] = useState('rect');
+  const [fgShape, setFgShape] = useState('rect');
+  const [bgShape, setBgShape] = useState('rect');
+  const [borderSize, setBorderSize] = useState(0);
 
   function makeExampleCode(componentName: string) {
     const imageSettingsCode = includeImage
@@ -64,7 +66,9 @@ function FullDemo() {
           excavate: imageExcavate,
         }
       : undefined,
-    shape,
+    bgShape,
+    fgShape,
+    borderSize,
   };
 
   return (
@@ -105,6 +109,31 @@ function FullDemo() {
         </div>
         <div>
           <label>
+            Background Shape:
+            <br />
+            <select
+              onChange={(e) => setBgShape(e.target.value)}
+              value={bgShape}>
+              <option value="rect">Rect</option>
+              <option value="circle">Circle</option>
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>
+            Foreground Shape:
+            <br />
+            <select
+              onChange={(e) => setFgShape(e.target.value)}
+              value={fgShape}>
+              <option value="rect">Rect</option>
+              <option value="circle">Circle</option>
+              <option value="star">Star</option>
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>
             Error Level:
             <br />
             <select onChange={(e) => setLevel(e.target.value)} value={level}>
@@ -117,13 +146,16 @@ function FullDemo() {
         </div>
         <div>
           <label>
-            Shape:
+            Border Size:
             <br />
-            <select onChange={(e) => setShape(e.target.value)} value={shape}>
-              <option value="rect">Rect</option>
-              <option value="circle">Circle</option>
-              <option value="star">Star</option>
-            </select>
+            <input
+              type="number"
+              step={1}
+              value={borderSize}
+              onChange={(e) =>
+                setBorderSize(Math.floor(e.target.valueAsNumber))
+              }
+            />
           </label>
         </div>
         <div>

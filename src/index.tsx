@@ -40,17 +40,42 @@ type QRProps = {
   imageSettings?: ImageSettings;
   title?: string;
   // Should be a real enum, but doesn't seem to be compatible with real code.
-  shape?: string;
+  bgShape?: string;
+  // Should be a real enum, but doesn't seem to be compatible with real code.
+  fgShape?: string;
+  borderSize?: number;
 };
 type QRPropsCanvas = QRProps & React.CanvasHTMLAttributes<HTMLCanvasElement>;
 type QRPropsSVG = QRProps & React.SVGAttributes<SVGSVGElement>;
+
+type Pos = {
+  x: number;
+  y: number;
+};
+
+type Rect = Pos & {
+  w: number;
+  h: number;
+};
+
+type Circle = Pos & {
+  r: number;
+};
+
+type Star = Pos & {
+  n: number;
+  r: number;
+  R: number;
+};
 
 const DEFAULT_SIZE = 128;
 const DEFAULT_LEVEL = 'L';
 const DEFAULT_BGCOLOR = '#FFFFFF';
 const DEFAULT_FGCOLOR = '#000000';
 const DEFAULT_INCLUDEMARGIN = false;
-const DEFAULT_SHAPE = 'rect';
+const DEFAULT_BGSHAPE = 'rect';
+const DEFAULT_FGSHAPE = 'rect';
+const DEFAULT_BORDER_SIZE = 0;
 
 const SPEC_MARGIN_SIZE = 4;
 const DEFAULT_MARGIN_SIZE = 0;
@@ -73,60 +98,40 @@ function isCorner(cellCount: number, cdx: number, rdx: number) {
   );
 }
 
-function rect(
-  ctx: CanvasRenderingContext2D,
-  margin: number,
-  rdx: number,
-  cdx: number
-) {
-  ctx.fillRect(cdx + margin, rdx + margin, 1, 1);
-}
-
-function circle(
-  ctx: CanvasRenderingContext2D,
-  margin: number,
-  rdx: number,
-  cdx: number
-) {
+function rect(ctx: CanvasRenderingContext2D, {x, y, w, h}: Rect) {
   ctx.beginPath();
-  ctx.arc(cdx + margin + 0.5, rdx + margin + 0.5, 0.5, 0, 2 * Math.PI, false);
+  ctx.rect(x, y, w, h);
   ctx.fill();
 }
 
-function star(
-  ctx: CanvasRenderingContext2D,
-  margin: number,
-  rdx: number,
-  cdx: number
-) {
-  // Reference: https://jsfiddle.net/m1erickson/8j6kdf4o/
-  const spikes = 5;
-  const innerRadius = 0.25;
-  const outerRadius = 0.5;
-  const cx = cdx + margin + 0.5;
-  const cy = rdx + margin + 0.5;
-  const step = Math.PI / spikes;
-
-  let rot = (Math.PI / 2) * 3;
-  let x = cx;
-  let y = cy;
-
+function circle(ctx: CanvasRenderingContext2D, {x, y, r}: Circle) {
   ctx.beginPath();
-  ctx.moveTo(cx, cy - outerRadius);
-  for (let i = 0; i < spikes; i++) {
-    x = cx + Math.cos(rot) * outerRadius;
-    y = cy + Math.sin(rot) * outerRadius;
-    ctx.lineTo(x, y);
+  ctx.arc(x, y, r, 0, 2 * Math.PI, false);
+  ctx.fill();
+}
+
+function star(ctx: CanvasRenderingContext2D, {x, y, n, r, R}: Star) {
+  // Reference: https://jsfiddle.net/m1erickson/8j6kdf4o/
+  let rot = (Math.PI / 2) * 3;
+  let dx = x;
+  let dy = y;
+
+  const step = Math.PI / n;
+  ctx.beginPath();
+  ctx.moveTo(x, y - R);
+  for (let i = 0; i < n; i++) {
+    dx = x + Math.cos(rot) * R;
+    dy = y + Math.sin(rot) * R;
+    ctx.lineTo(dx, dy);
     rot += step;
 
-    x = cx + Math.cos(rot) * innerRadius;
-    y = cy + Math.sin(rot) * innerRadius;
-    ctx.lineTo(x, y);
+    dx = x + Math.cos(rot) * r;
+    dy = y + Math.sin(rot) * r;
+    ctx.lineTo(dx, dy);
     rot += step;
   }
-  ctx.lineTo(cx, cy - outerRadius);
+  ctx.lineTo(x, y - R);
   ctx.closePath();
-  ctx.lineWidth = 5;
   ctx.fill();
 }
 
@@ -263,7 +268,9 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
     bgColor = DEFAULT_BGCOLOR,
     fgColor = DEFAULT_FGCOLOR,
     includeMargin = DEFAULT_INCLUDEMARGIN,
-    shape = DEFAULT_SHAPE,
+    bgShape = DEFAULT_BGSHAPE,
+    fgShape = DEFAULT_FGSHAPE,
+    borderSize = DEFAULT_BORDER_SIZE,
     marginSize,
     style,
     imageSettings,
@@ -308,7 +315,10 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
         ERROR_LEVEL_MAP[level]
       ).getModules();
 
-      const margin = getMarginSize(includeMargin, marginSize);
+      const circleOffset = 6 + ['L', 'M', 'Q', 'H'].indexOf(level);
+      const bgPadding =
+        bgShape === 'circle' ? circleOffset + borderSize : borderSize / 2;
+      const margin = getMarginSize(includeMargin, marginSize) + bgPadding;
       const numCells = cells.length + margin * 2;
       const calculatedImageSettings = getImageSettings(
         cells,
@@ -340,26 +350,44 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
       const scale = (size / numCells) * pixelRatio;
       ctx.scale(scale, scale);
 
-      // Draw solid background, only paint dark modules.
       ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, numCells, numCells);
+      ctx.strokeStyle = fgColor;
+
+      // Draw solid background, only paint dark modules.
+      if (bgShape === 'circle') {
+        circle(ctx, {
+          x: numCells / 2,
+          y: numCells / 2,
+          r: numCells / 2 - borderSize / 2,
+        });
+      } else {
+        rect(ctx, {x: 0, y: 0, w: numCells, h: numCells});
+      }
+
+      // Draw border with custom width.
+      if (borderSize > 0) {
+        ctx.lineWidth = borderSize;
+        ctx.stroke();
+      }
 
       ctx.fillStyle = fgColor;
-      if (shape === 'rect' && SUPPORTS_PATH2D) {
+      if (fgShape === 'rect' && SUPPORTS_PATH2D) {
         // $FlowFixMe: Path2D c'tor doesn't support args yet.
         ctx.fill(new Path2D(generatePath(cells, margin)));
       } else {
         cells.forEach(function (row, rdx) {
+          const y = rdx + margin;
           row.forEach(function (cell, cdx) {
+            const x = cdx + margin;
             if (cell) {
               if (isCorner(cells.length, cdx, rdx)) {
-                rect(ctx, margin, rdx, cdx);
-              } else if (shape === 'circle') {
-                circle(ctx, margin, rdx, cdx);
-              } else if (shape === 'star') {
-                star(ctx, margin, rdx, cdx);
+                rect(ctx, {x, y, w: 1, h: 1});
+              } else if (fgShape === 'circle') {
+                circle(ctx, {x: x + 0.5, y: y + 0.5, r: 0.5});
+              } else if (fgShape === 'star') {
+                star(ctx, {x: x + 0.5, y: y + 0.5, n: 5, r: 0.25, R: 0.5});
               } else {
-                rect(ctx, margin, rdx, cdx);
+                rect(ctx, {x: cdx + margin, y: rdx + margin, w: 1, h: 1});
               }
             }
           });
