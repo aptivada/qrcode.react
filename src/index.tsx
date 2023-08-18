@@ -318,7 +318,8 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
       const circleOffset = 6 + ['L', 'M', 'Q', 'H'].indexOf(level);
       const bgPadding =
         bgShape === 'circle' ? circleOffset + borderSize : borderSize / 2;
-      const margin = getMarginSize(includeMargin, marginSize) + bgPadding;
+      const rawMargin = getMarginSize(includeMargin, marginSize);
+      const margin = rawMargin + bgPadding;
       const numCells = cells.length + margin * 2;
       const calculatedImageSettings = getImageSettings(
         cells,
@@ -326,20 +327,6 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
         margin,
         imageSettings
       );
-
-      const image = _image.current;
-      const haveImageToRender =
-        calculatedImageSettings != null &&
-        image !== null &&
-        image.complete &&
-        image.naturalHeight !== 0 &&
-        image.naturalWidth !== 0;
-
-      if (haveImageToRender) {
-        if (calculatedImageSettings.excavation != null) {
-          cells = excavateModules(cells, calculatedImageSettings.excavation);
-        }
-      }
 
       // We're going to scale this so that the number of drawable units
       // matches the number of cells. This avoids rounding issues, but does
@@ -370,7 +357,70 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
         ctx.stroke();
       }
 
+      const draw = (x: number, y: number) => {
+        if (fgShape === 'circle') {
+          circle(ctx, {x: x + 0.5, y: y + 0.5, r: 0.5});
+        } else if (fgShape === 'star') {
+          star(ctx, {x: x + 0.5, y: y + 0.5, n: 5, r: 0.25, R: 0.5});
+        } else {
+          rect(ctx, {x, y, w: 1, h: 1});
+        }
+      };
+
+      const insideCircle = (x: number, y: number): boolean => {
+        const c = numCells / 2;
+        const r = c - borderSize - 1;
+        return (
+          Math.sqrt(Math.pow(c - x - 0.5, 2) + Math.pow(c - y - 0.5, 2)) < r
+        );
+      };
+
       ctx.fillStyle = fgColor;
+
+      // Draw filler modules for circle bgShape.
+      if (bgShape === 'circle') {
+        for (let buff = 1; buff < rawMargin + 2; buff++) {
+          for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < cells.length; col++) {
+              const start = {
+                i: row + 10,
+                y: row + borderSize + circleOffset - 10,
+              };
+              const end = {
+                i: row + cells.length - 18,
+                y: row + cells.length + borderSize + circleOffset + rawMargin * 2,
+              };
+              const j = col;
+              const x = (col + 10) * buff;
+              [start, end].forEach(({i, y}) => {
+                // top and bottom
+                if (cells[i][j] && insideCircle(x, y)) {
+                  draw(x, y);
+                }
+                // left and right
+                if (cells[j][i] && insideCircle(y, x)) {
+                  draw(y, x);
+                }
+              });
+            }
+          }
+        }
+      }
+
+      const image = _image.current;
+      const haveImageToRender =
+        calculatedImageSettings != null &&
+        image !== null &&
+        image.complete &&
+        image.naturalHeight !== 0 &&
+        image.naturalWidth !== 0;
+
+      if (haveImageToRender) {
+        if (calculatedImageSettings.excavation != null) {
+          cells = excavateModules(cells, calculatedImageSettings.excavation);
+        }
+      }
+
       if (fgShape === 'rect' && SUPPORTS_PATH2D) {
         // $FlowFixMe: Path2D c'tor doesn't support args yet.
         ctx.fill(new Path2D(generatePath(cells, margin)));
@@ -382,12 +432,8 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
             if (cell) {
               if (isCorner(cells.length, cdx, rdx)) {
                 rect(ctx, {x, y, w: 1, h: 1});
-              } else if (fgShape === 'circle') {
-                circle(ctx, {x: x + 0.5, y: y + 0.5, r: 0.5});
-              } else if (fgShape === 'star') {
-                star(ctx, {x: x + 0.5, y: y + 0.5, n: 5, r: 0.25, R: 0.5});
               } else {
-                rect(ctx, {x: cdx + margin, y: rdx + margin, w: 1, h: 1});
+                draw(x, y);
               }
             }
           });
