@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: ISC
  */
 
-import React, {useRef, useEffect, useState, useCallback} from 'react';
-import type {CSSProperties} from 'react';
+import type { CSSProperties } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import qrcodegen from './third-party/qrcodegen';
 
 type Modules = ReturnType<qrcodegen.QrCode['getModules']>;
@@ -486,6 +486,57 @@ const QRCodeCanvas = React.forwardRef(function QRCodeCanvas(
     </>
   );
 });
+type shapeOptions = 'star'|'circle'|'heart'
+const shapeMapping:any = {
+  star:{
+    fontSize:'1.3pt',
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<text x="${(x+0.5) * unitSize}" y="${(y+1) * unitSize}" text-anchor="middle">★</text>`
+  },
+  heart:{
+    fontSize:'.6pt',
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<text x="${(x+0.5) * unitSize}" y="${(y+1) * unitSize}" text-anchor="middle">❤️</text>`
+  },
+  circle:{
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<circle r="0.5" cx="${(x+0.5) * unitSize}" cy="${(y+0.5) * unitSize}" />`
+  },
+  rect:{},
+}
+function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string) {
+  const matrix = data;
+  const unitSize = 1;
+  const cornerBoxSize = 7;
+
+  // let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${matrix.length * unitSize}" height="${matrix.length * unitSize}">`;
+  let svgContent = `<style>
+    text,rect {
+      font-family: "Courier New";
+      fill:${fgColor??'#000000'};
+      ${!!shapeMapping[shape]?.fontSize ? `font-size:${shapeMapping[shape].fontSize};`:''}
+    }
+  </style>`;
+
+  const isCornerBox = (x:number, y:number) => {
+      const cornerPositions = [
+          { x: 0, y: 0 },
+          { x: matrix.length - cornerBoxSize, y: 0 },
+          { x: 0, y: matrix.length - cornerBoxSize }
+      ];
+      return cornerPositions.some(pos => x >= pos.x && x < pos.x + cornerBoxSize && y >= pos.y && y < pos.y + cornerBoxSize);
+  };
+
+  for (let y = 0; y < matrix.length; y++) {
+    for (let x = 0; x < matrix[y].length; x++) {
+      if (isCornerBox(x, y) && matrix[y][x]) {
+        svgContent += `<rect x="${x * unitSize}" y="${y * unitSize}" width="${unitSize}" height="${unitSize}"/>`;
+      } else if (matrix[y][x]) {
+        svgContent += shapeMapping[shape].cb({x,y,unitSize});
+      }
+    }
+  }
+
+  // svgContent += '</svg>';
+  return svgContent;
+}
 
 const QRCodeSVG = React.forwardRef(function QRCodeSVG(
   props: QRPropsSVG,
@@ -543,7 +594,10 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
   // For level 1, 441 nodes -> 2
   // For level 40, 31329 -> 2
   const fgPath = generatePath(cells, margin);
-
+  let shapeQRCodeSVG = ''
+  if(['heart','star','circle'].includes(otherProps.fgShape??'')){
+    shapeQRCodeSVG = createShapeQRCodeSVG(cells,otherProps.fgShape as shapeOptions,fgColor)
+  }
   return (
     <svg
       height={size}
@@ -557,7 +611,8 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
         d={`M0,0 h${numCells}v${numCells}H0z`}
         shapeRendering="crispEdges"
       />
-      <path fill={fgColor} d={fgPath} shapeRendering="crispEdges" />
+      {['rect'].includes(otherProps.fgShape??'') && <path fill={fgColor} d={fgPath} shapeRendering="crispEdges" />}
+      {['star','circle','heart'].includes(otherProps.fgShape??'') && <g dangerouslySetInnerHTML={{ __html: shapeQRCodeSVG }} />}
       {image}
     </svg>
   );
@@ -587,4 +642,5 @@ const QRCode = React.forwardRef(function QRCode(
   );
 });
 
-export {QRCode as default, QRCodeCanvas, QRCodeSVG};
+export { QRCodeCanvas, QRCodeSVG, QRCode as default };
+
