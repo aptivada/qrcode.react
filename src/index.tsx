@@ -499,15 +499,19 @@ const shapeMapping:any = {
   circle:{
     cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<circle r="0.5" cx="${(x+0.5) * unitSize}" cy="${(y+0.5) * unitSize}" />`
   },
-  rect:{},
+  rect:{
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<rect x="${x * unitSize}" y="${y * unitSize}" width="${unitSize}" height="${unitSize}"/>`
+  },
 }
-function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string) {
+function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string, offsetX:number=0,offsetY:number=0) {
   const matrix = data;
   const unitSize = 1;
   const cornerBoxSize = 7;
 
-  // let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${matrix.length * unitSize}" height="${matrix.length * unitSize}">`;
   let svgContent = `<style>
+    circle.transparent{
+      fill:transparent;
+    }
     text,rect,circle {
       font-family: "Courier New";
       fill:${fgColor??'#000000'};
@@ -527,14 +531,13 @@ function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string) {
   for (let y = 0; y < matrix.length; y++) {
     for (let x = 0; x < matrix[y].length; x++) {
       if (isCornerBox(x, y) && matrix[y][x]) {
-        svgContent += `<rect x="${x * unitSize}" y="${y * unitSize}" width="${unitSize}" height="${unitSize}"/>`;
+        svgContent += shapeMapping.rect.cb({x:(x+offsetX),y:(y+offsetY),unitSize})
       } else if (matrix[y][x]) {
-        svgContent += shapeMapping[shape].cb({x,y,unitSize});
+        svgContent += shapeMapping[shape].cb({x:(x+offsetX),y:(y+offsetY),unitSize});
       }
     }
   }
-
-  // svgContent += '</svg>';
+  
   return svgContent;
 }
 
@@ -546,9 +549,11 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
     value,
     size = DEFAULT_SIZE,
     level = DEFAULT_LEVEL,
+    bgShape = DEFAULT_BGSHAPE,
     bgColor = DEFAULT_BGCOLOR,
     fgColor = DEFAULT_FGCOLOR,
     includeMargin = DEFAULT_INCLUDEMARGIN,
+    borderSize = DEFAULT_BORDER_SIZE,
     title,
     marginSize,
     imageSettings,
@@ -560,7 +565,11 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
     ERROR_LEVEL_MAP[level]
   ).getModules();
 
-  const margin = getMarginSize(includeMargin, marginSize);
+  const circleOffset = 6 + ['L', 'M', 'Q', 'H'].indexOf(level);
+  const bgPadding =
+    bgShape === 'circle' ? circleOffset + borderSize : borderSize / 2;
+  const rawMargin = getMarginSize(includeMargin, marginSize);
+  const margin = rawMargin + bgPadding;
   const numCells = cells.length + margin * 2;
   const calculatedImageSettings = getImageSettings(
     cells,
@@ -568,6 +577,57 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
     margin,
     imageSettings
   );
+
+  const insideCircle = (x: number, y: number): boolean => {
+    const c = numCells / 2;
+    const r = c - borderSize - 1;
+    return (
+      Math.sqrt(Math.pow(c - x - 0.5, 2) + Math.pow(c - y - 0.5, 2)) < r
+    );
+  };
+
+  // Draw solid background, only paint dark modules.
+  let bgShapeSVG = ''
+  if (bgShape === 'circle') {
+      bgShapeSVG += `<style>
+        circle.transparent{
+          fill:transparent;
+        }
+        text,rect,circle {
+          font-family: "Courier New";
+          fill:${fgColor??'#000000'};
+          ${!!shapeMapping[otherProps.fgShape??'rect']?.fontSize ? `font-size:${shapeMapping[otherProps.fgShape??'rect'].fontSize};`:''}
+        }
+    </style>`;
+    bgShapeSVG += `<circle class="transparent" cx="${numCells/2}" cy="${numCells/2}" r="${numCells/2 - borderSize / 2}" stroke="${fgColor}" stroke-width="${borderSize}"/>`
+
+    for (let buff = 1; buff < rawMargin + 2; buff++) {
+      for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < cells.length; col++) {
+          const start = {
+            i: row + 10,
+            y: row + borderSize + circleOffset - 10,
+          };
+          const end = {
+            i: row + cells.length - 18,
+            y: row + cells.length + borderSize + circleOffset + rawMargin * 2,
+          };
+          const j = col;
+          const x = (col + 10) * buff;
+          [start, end].forEach(({i, y}) => {
+            // top and bottom
+            if (cells[i][j] && insideCircle(x, y)) {
+              bgShapeSVG += shapeMapping[otherProps.fgShape??'rect'].cb({x,y,unitSize:1});
+            }
+            // left and right
+            if (cells[j][i] && insideCircle(y, x)) {
+              bgShapeSVG += shapeMapping[otherProps.fgShape??'rect'].cb({x:y,y:x,unitSize:1});
+            }
+          });
+        }
+      }
+    }
+  }
 
   let image = null;
   if (imageSettings != null && calculatedImageSettings != null) {
@@ -593,11 +653,17 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
   // way faster than DOM ops.
   // For level 1, 441 nodes -> 2
   // For level 40, 31329 -> 2
-  const fgPath = generatePath(cells, margin);
-  let shapeQRCodeSVG = ''
-  if(['heart','star','circle'].includes(otherProps.fgShape??'')){
-    shapeQRCodeSVG = createShapeQRCodeSVG(cells,otherProps.fgShape as shapeOptions,fgColor)
+  let fgPath = '';
+  if(['rect'].includes(otherProps.fgShape??'')){
+    const fgPath = generatePath(cells, margin);
   }
+
+  //build the svg data with a shape instead of a rectangle / single path
+  let shapeQRCodeSVG = '';
+  if(['heart','star','circle'].includes(otherProps.fgShape??'')){
+    shapeQRCodeSVG = createShapeQRCodeSVG(cells,otherProps.fgShape as shapeOptions,fgColor,margin,margin)
+  }
+
   return (
     <svg
       height={size}
@@ -611,6 +677,7 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
         d={`M0,0 h${numCells}v${numCells}H0z`}
         shapeRendering="crispEdges"
       />
+      {bgShape == 'circle' && <g dangerouslySetInnerHTML={{ __html: bgShapeSVG }} />}
       {['rect'].includes(otherProps.fgShape??'') && <path fill={fgColor} d={fgPath} shapeRendering="crispEdges" />}
       {['star','circle','heart'].includes(otherProps.fgShape??'') && <g dangerouslySetInnerHTML={{ __html: shapeQRCodeSVG }} />}
       {image}
