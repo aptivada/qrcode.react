@@ -537,7 +537,7 @@ function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string, offse
       }
     }
   }
-  
+
   return svgContent;
 }
 
@@ -589,17 +589,7 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
   // Draw solid background, only paint dark modules.
   let bgShapeSVG = ''
   if (bgShape === 'circle') {
-      bgShapeSVG += `<style>
-        circle.transparent{
-          fill:transparent;
-        }
-        text,rect,circle {
-          font-family: "Courier New";
-          fill:${fgColor??'#000000'};
-          ${!!shapeMapping[otherProps.fgShape??'rect']?.fontSize ? `font-size:${shapeMapping[otherProps.fgShape??'rect'].fontSize};`:''}
-        }
-    </style>`;
-    bgShapeSVG += `<circle class="transparent" cx="${numCells/2}" cy="${numCells/2}" r="${numCells/2 - borderSize / 2}" stroke="${fgColor}" stroke-width="${borderSize}"/>`
+    bgShapeSVG += `<circle class="bg" cx="${numCells/2}" cy="${numCells/2}" r="${numCells/2 - borderSize / 2}" stroke="${fgColor}" stroke-width="${borderSize}"/>`
 
     for (let buff = 1; buff < rawMargin + 2; buff++) {
       for (let row = 0; row < 10; row++) {
@@ -655,7 +645,7 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
   // For level 40, 31329 -> 2
   let fgPath = '';
   if(['rect'].includes(otherProps.fgShape??'')){
-    const fgPath = generatePath(cells, margin);
+    fgPath = generatePath(cells, margin);
   }
 
   //build the svg data with a shape instead of a rectangle / single path
@@ -672,11 +662,23 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
       ref={forwardedRef}
       {...otherProps}>
       {!!title && <title>{title}</title>}
-      <path
-        fill={bgColor}
-        d={`M0,0 h${numCells}v${numCells}H0z`}
-        shapeRendering="crispEdges"
-      />
+      <style>{`
+        .bg{fill:${bgColor??'#ffffff'};}
+        text,rect,circle {
+          font-family: "Courier New";
+          fill:${fgColor??'#000000'};
+          ${!!shapeMapping[otherProps.fgShape??'rect']?.fontSize ? `font-size:${shapeMapping[otherProps.fgShape??'rect'].fontSize};`:''}
+        }
+      `}</style>
+      {bgShape == 'rect' && (
+        <rect
+          className="bg"
+          width={numCells}
+          height={numCells}
+          stroke={fgColor}
+          strokeWidth={borderSize}
+        />
+      )}
       {bgShape == 'circle' && <g dangerouslySetInnerHTML={{ __html: bgShapeSVG }} />}
       {['rect'].includes(otherProps.fgShape??'') && <path fill={fgColor} d={fgPath} shapeRendering="crispEdges" />}
       {['star','circle','heart'].includes(otherProps.fgShape??'') && <g dangerouslySetInnerHTML={{ __html: shapeQRCodeSVG }} />}
