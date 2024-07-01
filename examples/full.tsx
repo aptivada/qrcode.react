@@ -1,5 +1,5 @@
-import {QRCodeSVG, QRCodeCanvas} from '..';
-import React, {useState} from 'react';
+import React, { useState } from 'react';
+import { QRCodeCanvas, QRCodeSVG } from '..';
 
 function FullDemo() {
   const [value, setValue] = useState(
@@ -129,6 +129,7 @@ function FullDemo() {
               <option value="rect">Rect</option>
               <option value="circle">Circle</option>
               <option value="star">Star</option>
+              <option value="heart">Heart</option>
             </select>
           </label>
         </div>
@@ -325,4 +326,5 @@ function FullDemo() {
   );
 }
 
-export {FullDemo};
+export { FullDemo };
+
