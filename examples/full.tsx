@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QRCodeCanvas, QRCodeSVG } from '..';
+import SvgChart from './svg_chart.tsx';
 
 function FullDemo() {
   const [value, setValue] = useState(
@@ -71,7 +72,7 @@ function FullDemo() {
     borderSize,
   };
 
-  return (
+  return (<>
     <div className="container">
       <div className="form">
         <div>
@@ -323,7 +324,8 @@ function FullDemo() {
         </div>
       </div>
     </div>
-  );
+    <SvgChart />
+  </>);
 }
 
 export { FullDemo };
