@@ -490,17 +490,17 @@ type shapeOptions = 'star'|'circle'|'heart'
 const shapeMapping:any = {
   star:{
     fontSize:'1.3pt',
-    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<text x="${(x+0.5) * unitSize}" y="${(y+1) * unitSize}" text-anchor="middle">★</text>`
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<text class="react-qrcode-svg" x="${(x+0.5) * unitSize}" y="${(y+1) * unitSize}" text-anchor="middle">★</text>`
   },
   heart:{
     fontSize:'.6pt',
-    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<text x="${(x+0.5) * unitSize}" y="${(y+1) * unitSize}" text-anchor="middle">❤️</text>`
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<text class="react-qrcode-svg" x="${(x+0.5) * unitSize}" y="${(y+1) * unitSize}" text-anchor="middle">❤️</text>`
   },
   circle:{
-    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<circle r="0.5" cx="${(x+0.5) * unitSize}" cy="${(y+0.5) * unitSize}" />`
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<circle class="react-qrcode-svg" r="0.5" cx="${(x+0.5) * unitSize}" cy="${(y+0.5) * unitSize}" />`
   },
   rect:{
-    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<rect x="${x * unitSize}" y="${y * unitSize}" width="${unitSize}" height="${unitSize}"/>`
+    cb:({x,y,unitSize}:{x:number,y:number,unitSize:number})=>`<rect class="react-qrcode-svg" x="${x * unitSize}" y="${y * unitSize}" width="${unitSize}" height="${unitSize}"/>`
   },
 }
 function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string, offsetX:number=0,offsetY:number=0) {
@@ -509,10 +509,10 @@ function createShapeQRCodeSVG(data:any,shape:shapeOptions,fgColor?:string, offse
   const cornerBoxSize = 7;
 
   let svgContent = `<style>
-    circle.transparent{
+    circle.react-qrcode-svg.transparent{
       fill:transparent;
     }
-    text,rect,circle {
+    text.react-qrcode-svg, rect.react-qrcode-svg, circle.react-qrcode-svg {
       font-family: "Courier New";
       fill:${fgColor??'#000000'};
       ${!!shapeMapping[shape]?.fontSize ? `font-size:${shapeMapping[shape].fontSize};`:''}
@@ -589,7 +589,7 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
   // Draw solid background, only paint dark modules.
   let bgShapeSVG = ''
   if (bgShape === 'circle') {
-    bgShapeSVG += `<circle class="bg" cx="${numCells/2}" cy="${numCells/2}" r="${numCells/2 - borderSize / 2}" stroke="${fgColor}" stroke-width="${borderSize}"/>`
+    bgShapeSVG += `<circle class="react-qrcode-svg bg" cx="${numCells/2}" cy="${numCells/2}" r="${numCells/2 - borderSize / 2}" stroke="${fgColor}" stroke-width="${borderSize}"/>`
 
     for (let buff = 1; buff < rawMargin + 2; buff++) {
       for (let row = 0; row < 10; row++) {
@@ -663,8 +663,8 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
       {...otherProps}>
       {!!title && <title>{title}</title>}
       <style>{`
-        .bg{fill:${bgColor??'#ffffff'};}
-        text,rect,circle {
+        .react-qrcode-svg.bg{fill:${bgColor??'#ffffff'};}
+        text.react-qrcode-svg, rect.react-qrcode-svg, circle.react-qrcode-svg {
           font-family: "Courier New";
           fill:${fgColor??'#000000'};
           ${!!shapeMapping[otherProps.fgShape??'rect']?.fontSize ? `font-size:${shapeMapping[otherProps.fgShape??'rect'].fontSize};`:''}
@@ -672,7 +672,7 @@ const QRCodeSVG = React.forwardRef(function QRCodeSVG(
       `}</style>
       {bgShape == 'rect' && (
         <rect
-          className="bg"
+          className="react-qrcode-svg bg"
           width={numCells}
           height={numCells}
           stroke={fgColor}
